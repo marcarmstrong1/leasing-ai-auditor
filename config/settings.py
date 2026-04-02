@@ -1,5 +1,5 @@
 import os
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # GCP
@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     gmail_credentials_secret: str = "gmail-api-credentials"
 
     # Engagement config
-    handoff_wait_hours: int = 72        # How long to wait for human follow-up
-    human_response_benchmark_hours: int = 4  # What we consider "good" human response time
+    handoff_wait_hours: int = 72
+    human_response_benchmark_hours: int = 4
 
     class Config:
         env_file = ".env"
