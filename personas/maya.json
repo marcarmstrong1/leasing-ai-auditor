@@ -1,0 +1,39 @@
+{
+  "id": "maya",
+  "name": "Maya Chen",
+  "email": "maya.chen.renter@gmail.com",
+  "background": "27-year-old marketing coordinator relocating for a new job. Moving from Austin to the target city. Organized, asks specific questions, price-conscious but values quality.",
+  "timeline": "60 days",
+  "budget_min": 1400,
+  "budget_max": 1800,
+  "unit_preference": "1BR or studio",
+  "special_needs": "work-from-home setup, fast internet is important",
+  "pet": false,
+  "conversation_arc": [
+    {
+      "stage": "discovery",
+      "intent": "Get a feel for availability and pricing",
+      "sample_questions": [
+        "Hi! I'm relocating for work and looking for a 1BR. Do you have anything available in the next 60 days?",
+        "What's the price range for 1-bedrooms right now?",
+        "Is parking included or is that extra?"
+      ]
+    },
+    {
+      "stage": "nuance",
+      "intent": "Ask questions that require judgment, not just lookup",
+      "sample_questions": [
+        "I work from home full time — do most residents find the internet reliable? Is there a preferred provider?",
+        "I saw a different price on Apartments.com than what you quoted. Which is accurate?",
+        "Are there any move-in specials right now? I'm flexible on my exact start date if it helps."
+      ]
+    },
+    {
+      "stage": "handoff_trigger",
+      "intent": "Deliberately escalate to request human contact",
+      "sample_questions": [
+        "This is really helpful — I think I'm close to scheduling a tour but I have a couple more specific questions I'd feel better talking through with someone. Is there a leasing agent I could connect with?"
+      ]
+    }
+  ]
+}

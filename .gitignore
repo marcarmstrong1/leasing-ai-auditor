@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
+
+# GCP credentials (never commit these)
+*.json
+!personas/*.json
+
+# Playwright
+.playwright/
+
+# Local DB
+*.db
+*.sqlite
+
+# Reports output
+reports/output/
+
+# IDE
+.vscode/
+.idea/
