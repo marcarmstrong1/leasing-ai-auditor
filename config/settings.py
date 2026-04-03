@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     region: str = os.environ.get("GCP_REGION", "us-central1")
 
     # Vertex AI / Gemini
-    gemini_model: str = "gemini-1.5-pro"
+    gemini_model: str = "gemini-2.5-pro"
     gemini_temperature: float = 0.7
     gemini_max_tokens: int = 2048
 
