@@ -1,0 +1,43 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/leasing-ai-auditor:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/leasing-ai-auditor:latest'
+      - '.'
+    id: 'build'
+
+  # Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'gcr.io/$PROJECT_ID/leasing-ai-auditor'
+    id: 'push'
+    waitFor: ['build']
+
+  # Deploy to Cloud Run Jobs
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'jobs'
+      - 'update'
+      - 'leasing-ai-auditor'
+      - '--image=gcr.io/$PROJECT_ID/leasing-ai-auditor:$COMMIT_SHA'
+      - '--region=$_REGION'
+    id: 'deploy'
+    waitFor: ['push']
+
+substitutions:
+  _REGION: us-central1
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - 'gcr.io/$PROJECT_ID/leasing-ai-auditor:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/leasing-ai-auditor:latest'

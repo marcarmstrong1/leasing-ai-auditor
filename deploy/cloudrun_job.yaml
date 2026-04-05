@@ -1,0 +1,45 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: leasing-ai-auditor
+spec:
+  template:
+    spec:
+      template:
+        spec:
+          containers:
+            - image: gcr.io/PROJECT_ID/leasing-ai-auditor:latest
+              resources:
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+              env:
+                - name: ENVIRONMENT
+                  value: "production"
+                - name: GCP_PROJECT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: gcp-project-id
+                      key: latest
+                - name: GCP_REGION
+                  value: "us-central1"
+                - name: DB_INSTANCE_CONNECTION_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-instance-connection-name
+                      key: latest
+                - name: DB_NAME
+                  value: "leasing_auditor"
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-user
+                      key: latest
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-password
+                      key: latest
+          serviceAccountName: leasing-auditor-sa
+          timeoutSeconds: 7200
+          maxRetries: 1
