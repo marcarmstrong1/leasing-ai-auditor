@@ -1,7 +1,7 @@
 {
   "id": "garcia",
   "name": "Sofia Garcia",
-  "email": "sofia.garcia.renter@gmail.com",
+  "email": "sofia.garcia.jturner@outlook.com",
   "background": "34-year-old relocating with spouse and a dog. Needs space, stability, and pet-friendly policies. Detail-oriented, reads the fine print, asks follow-up questions.",
   "timeline": "45 days",
   "budget_min": 1800,
@@ -15,7 +15,7 @@
       "stage": "discovery",
       "intent": "Confirm pet policy and 2BR availability",
       "sample_questions": [
-        "Hi, my husband and I are looking for a 2-bedroom and we have a dog — a 65lb lab mix. Are you pet friendly?",
+        "Hi, my husband and I are looking for a 2-bedroom and we have a dog \u2014 a 65lb lab mix. Are you pet friendly?",
         "What are the pet fees and deposits? Is there a weight limit?",
         "Do you have any 2BRs available in the next 45 days?"
       ]
@@ -25,7 +25,7 @@
       "intent": "Probe on lease terms and specifics",
       "sample_questions": [
         "Is the pet deposit refundable at move-out?",
-        "We'd really prefer ground floor or a building with an elevator — is that something you can accommodate?",
+        "We'd really prefer ground floor or a building with an elevator \u2014 is that something you can accommodate?",
         "What happens if we need to break the lease early? My husband's job could require relocation."
       ]
     },

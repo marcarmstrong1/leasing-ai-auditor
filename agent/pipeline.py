@@ -108,7 +108,7 @@ def phase_email(
     property_name: str,
     leasing_email: str,
     webchat_summary: str,
-    credentials_path: str,
+    email_password: str,
 ) -> Optional[str]:
     """
     Phase 2: Send follow-up email from persona inbox.
@@ -118,7 +118,7 @@ def phase_email(
 
     monitor = EmailMonitor(
         persona=persona,
-        credentials_path=credentials_path,
+        email_password=email_password,
     )
     monitor.authenticate()
 
@@ -142,7 +142,7 @@ def phase_monitor(
     persona: dict,
     sent_message_id: str,
     handoff_triggered_at: datetime,
-    credentials_path: str,
+    email_password: str,
 ) -> Optional[dict]:
     """
     Phase 3: Monitor inbox for human reply.
@@ -153,7 +153,7 @@ def phase_monitor(
 
     monitor = EmailMonitor(
         persona=persona,
-        credentials_path=credentials_path,
+        email_password=email_password,
     )
     monitor.authenticate()
 
@@ -263,7 +263,7 @@ def phase_report(
 async def run_full_pipeline(
     property_id: str,
     persona_id: str,
-    credentials_path: str,
+    email_password: str,
     headless: bool = True,
     skip_email: bool = False,
     skip_monitor: bool = False,
@@ -350,7 +350,7 @@ async def run_full_pipeline(
                 property_name=property_name,
                 leasing_email=leasing_email,
                 webchat_summary=webchat_summary,
-                credentials_path=credentials_path,
+                email_password=email_password,
             )
             summary["email_sent"] = message_id is not None
 
@@ -374,7 +374,7 @@ async def run_full_pipeline(
                 persona=persona,
                 sent_message_id=message_id,
                 handoff_triggered_at=handoff_at,
-                credentials_path=credentials_path,
+                email_password=email_password,
             )
             summary["human_replied"] = reply is not None
 
@@ -490,7 +490,7 @@ def main():
         result = asyncio.run(run_full_pipeline(
             property_id=args.property_id,
             persona_id=args.persona,
-            credentials_path=args.credentials,
+            email_password=os.environ.get("MAYA_EMAIL_PASSWORD", ""),
             headless=not args.no_headless,
             skip_email=args.skip_email,
             skip_monitor=args.skip_monitor,

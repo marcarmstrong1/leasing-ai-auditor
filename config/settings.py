@@ -28,3 +28,8 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
+
+
+# Persona email passwords (pulled from Secret Manager in production)
+maya_email_password: str = os.environ.get("MAYA_EMAIL_PASSWORD", "")
+garcia_email_password: str = os.environ.get("GARCIA_EMAIL_PASSWORD", "")
