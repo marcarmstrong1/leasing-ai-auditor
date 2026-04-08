@@ -116,6 +116,15 @@ class BrowserAgent:
                 "--disable-dev-shm-usage",
                 "--disable-blink-features=AutomationControlled",
                 "--window-size=1440,900",
+                "--disable-infobars",
+                "--disable-extensions",
+                "--disable-gpu",
+                "--start-maximized",
+                "--ignore-certificate-errors",
+                "--allow-running-insecure-content",
+                # Make it look like a real user profile
+                "--user-data-dir=/tmp/chrome-profile",
+                "--profile-directory=Default",
             ]
         )
         logger.info("Browser launched")
@@ -132,19 +141,54 @@ class BrowserAgent:
     async def new_page(self) -> Page:
         context = await self.browser.new_context(
             user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/123.0.0.0 Safari/537.36"
             ),
             viewport={"width": 1440, "height": 900},
             locale="en-US",
             timezone_id="America/Chicago",
+            color_scheme="light",
+            device_scale_factor=1,
+            has_touch=False,
+            java_script_enabled=True,
+            permissions=["geolocation"],
+            geolocation={"latitude": 29.7604, "longitude": -95.3698},  # Houston
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+            }
         )
         await context.add_init_script("""
+            // Remove webdriver flag
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-            Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3]});
+            // Realistic plugin list
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => {
+                    return [
+                        {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer'},
+                        {name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
+                        {name: 'Native Client', filename: 'internal-nacl-plugin'},
+                    ];
+                }
+            });
+            // Realistic language settings
+            Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+            // Realistic hardware concurrency
+            Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
+            // Realistic device memory
+            Object.defineProperty(navigator, 'deviceMemory', {get: () => 8});
+            // Realistic screen properties
+            Object.defineProperty(screen, 'colorDepth', {get: () => 24});
+            Object.defineProperty(screen, 'pixelDepth', {get: () => 24});
         """)
         self.page = await context.new_page()
+        # Apply stealth patches to avoid headless browser detection
+        from playwright_stealth import stealth_async
+        await stealth_async(self.page)
         return self.page
 
     async def navigate_to_property(self, url: str) -> bool:
