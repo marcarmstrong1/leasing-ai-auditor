@@ -185,8 +185,8 @@ class BrowserAgent:
         """)
         self.page = await context.new_page()
         # Apply stealth patches to avoid headless browser detection
-        from playwright_stealth import stealth_async
-        await stealth_async(self.page)
+        from playwright_stealth import stealth
+        stealth(self.page)
         return self.page
 
     async def navigate_to_property(self, url: str) -> bool:

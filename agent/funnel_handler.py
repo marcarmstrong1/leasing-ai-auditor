@@ -35,8 +35,8 @@ async def open_funnel_chat(page: Page) -> Optional[object]:
     logger.info("Opening Funnel chat...")
     # Re-apply stealth to this page context just in case
     try:
-        from playwright_stealth import stealth_async
-        await stealth_async(page)
+        from playwright_stealth import stealth
+        stealth(page)
         logger.debug("Stealth applied to page")
     except Exception as e:
         logger.debug(f"Stealth patch skipped: {e}")
