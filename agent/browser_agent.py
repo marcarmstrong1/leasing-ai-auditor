@@ -123,8 +123,6 @@ class BrowserAgent:
                 "--ignore-certificate-errors",
                 "--allow-running-insecure-content",
                 # Make it look like a real user profile
-                "--user-data-dir=/tmp/chrome-profile",
-                "--profile-directory=Default",
             ]
         )
         logger.info("Browser launched")
