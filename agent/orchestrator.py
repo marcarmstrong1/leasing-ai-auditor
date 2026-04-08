@@ -196,7 +196,9 @@ Respond with ONLY the message text. No labels, no explanation, just the message.
             ConversationStage.HANDOFF_TRIGGER: (
                 "Naturally express that you have more specific questions and would "
                 "feel more comfortable talking to a person before scheduling a tour. "
-                "Ask if a leasing agent can reach out. Provide your email if it feels natural."
+                "Ask if a leasing agent can reach out. "
+                f"If providing an email, use the persona's real email: {persona['email']}. "
+                "Do not make up or use placeholder email addresses."
             ),
             ConversationStage.HUMAN_FOLLOWUP: (
                 "Respond to whatever the human leasing agent said. "
