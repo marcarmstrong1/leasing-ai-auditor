@@ -9,6 +9,7 @@ Two core jobs:
 """
 
 import json
+import re
 from datetime import datetime
 from typing import Optional
 from loguru import logger
@@ -288,8 +289,43 @@ No markdown, no explanation outside the JSON. Just the JSON object.
             logger.success(f"Scoring complete for engagement {engagement_id}")
             return scores
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse scoring JSON: {e}\nRaw: {raw}")
-            raise
+            logger.warning(f"Initial JSON parse failed: {e} — attempting repair")
+            try:
+                # Fix 1: Remove trailing commas before } or ]
+                repaired = re.sub(r",\s*([}\]])", r"\1", raw)
+                # Fix 2: Ensure the JSON is terminated properly
+                # Count braces and close any that are open
+                open_braces = repaired.count("{") - repaired.count("}")
+                open_brackets = repaired.count("[") - repaired.count("]")
+                repaired += "}" * open_braces + "]" * open_brackets
+                scores = json.loads(repaired)
+                logger.success(f"Scoring complete after JSON repair for {engagement_id}")
+                return scores
+            except json.JSONDecodeError:
+                # Fix 3: Extract whatever valid dimension blocks we can
+                logger.warning("Attempting partial score extraction...")
+                partial = {}
+                dimensions = [
+                    "ai_responsiveness", "ai_accuracy", "handoff_communication",
+                    "context_continuity", "human_response_speed", "human_quality"
+                ]
+                for dim in dimensions:
+                    pattern = rf'"{dim}"\s*:\s*{{[^}}]*"score"\s*:\s*(\d+(?:\.\d+)?)[^}}]*"rationale"\s*:\s*"([^"]*)"'
+                    match = re.search(pattern, raw, re.DOTALL)
+                    if match:
+                        partial[dim] = {
+                            "score": float(match.group(1)),
+                            "rationale": match.group(2)
+                        }
+                # Extract overall notes
+                notes_match = re.search(r'"overall_notes"\s*:\s*"([^"]*)"', raw)
+                if notes_match:
+                    partial["overall_notes"] = notes_match.group(1)
+                if partial:
+                    logger.success(f"Partial scores extracted: {list(partial.keys())}")
+                    return partial
+                logger.error(f"Could not parse scoring JSON: {e}\nRaw: {raw}")
+                raise
 
     def _format_transcript_for_scoring(self, transcript: list[dict]) -> str:
         lines = []
