@@ -1,10 +1,13 @@
 """
-Funnel chat handler.
+Funnel chat handler — built from live DOM inspection of Camden Yorktown.
 
-Funnel's actual sequence on Camden:
-1. Iframe exists with about:blank
-2. Click main launcher -> iframe gets injected with a pop-up bubble
-3. Click the pop-up bubble -> full chat UI with input appears
+Structure:
+- Container: div#funnel-chat-container-{uuid} (dynamically created on click)
+- Iframe: iframe.funnel-chat-iframe (inside the container)
+- Messages: div[data-testid="messages"] inside the iframe
+- Each message: div[data-testid="message"] with aria-label containing full text
+- Message text: div.dPKQZ inside each message
+- Input: textarea or input inside the iframe
 """
 
 import asyncio
@@ -14,159 +17,132 @@ from loguru import logger
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeout
 
 
-FUNNEL_IFRAME_SELECTORS = [
-    "iframe[class*='funnel']",
-    "iframe[data-testid='iframe']",
-    "iframe[title='Chatbot']",
-    "iframe[title='Chat']",
-    "[id*='funnel-chat'] iframe",
-    "[id*='funnel'] iframe",
-]
-
 FUNNEL_INPUT_SELECTORS = [
     "textarea",
     "input[type='text']",
-    "[contenteditable='true']",
     "[placeholder*='message' i]",
     "[placeholder*='type' i]",
     "[placeholder*='Ask' i]",
     "[data-testid*='input']",
 ]
 
-# Selectors for the Funnel pop-up greeting bubble
-FUNNEL_POPUP_SELECTORS = [
-    "[data-testid='pop-up-message']",
-    "[aria-label*='availability' i]",
-    "[aria-label*='tour' i]",
-    "[aria-label*='chat' i]",
-    "[class*='pop-up']",
-    "[class*='popup']",
-    "[class*='greeting']",
-    "[class*='bubble']",
-    "[tabindex='0']",  # Funnel makes the bubble focusable
-]
-
 
 async def open_funnel_chat(page: Page) -> Optional[object]:
-    logger.info("Using Funnel iframe handler...")
+    """
+    Waits for the Funnel launcher button, clicks it, waits for the
+    iframe to be injected, then returns the frame ready for input.
+    """
+    logger.info("Opening Funnel chat...")
 
-    # Step 1: Get iframe frame reference
-    iframe_frame = None
-    for selector in FUNNEL_IFRAME_SELECTORS:
-        try:
-            iframe_el = await page.wait_for_selector(
-                selector, timeout=8000, state="attached"
-            )
-            if iframe_el:
-                frame = await iframe_el.content_frame()
-                if frame:
-                    logger.info(f"Got iframe reference (url: {frame.url})")
-                    iframe_frame = frame
-                    break
-        except PlaywrightTimeout:
-            continue
-
-    if not iframe_frame:
-        logger.warning("Could not get Funnel iframe reference")
-        return None
-
-    # Step 2: Click the main page launcher
-    logger.info("Clicking main page launcher...")
-    await page.evaluate("""
+    # Step 1: Click the launcher — Funnel injects the container+iframe on click
+    # The container div doesn't exist yet, so we click whatever triggers it
+    launcher_clicked = await page.evaluate("""
         () => {
-            const selectors = [
-                '[id*="funnel"] button',
-                '[class*="funnel"] button',
-                '[id*="funnel-chat-container"] button',
+            // Try the quES0 div which is the launcher on Camden
+            const launchers = [
+                '.quES0',
+                '[class*="launcher"]',
+                '[aria-label*="chat" i]',
+                '[aria-label*="Chat"]',
+                'button[class*="chat"]',
             ];
-            for (const sel of selectors) {
+            for (const sel of launchers) {
                 const el = document.querySelector(sel);
                 if (el) {
                     el.dispatchEvent(new MouseEvent('click', {bubbles: true}));
                     return sel;
                 }
             }
+            return null;
         }
     """)
+    logger.info(f"Launcher clicked: {launcher_clicked}")
     await asyncio.sleep(2)
 
-    # Step 3: Wait for iframe content to appear
-    logger.info("Waiting for iframe content...")
-    for attempt in range(15):
+    # Step 2: Wait for Funnel to inject the iframe into the DOM
+    logger.info("Waiting for funnel-chat-iframe to appear...")
+    iframe_el = None
+    for attempt in range(20):
         try:
-            html = await iframe_frame.evaluate(
-                "() => document.body ? document.body.innerHTML : ''"
+            iframe_el = await page.wait_for_selector(
+                "iframe.funnel-chat-iframe",
+                timeout=2000,
+                state="attached"
             )
-            if html and len(html) > 50:
-                logger.info(f"Iframe has content (attempt {attempt+1})")
+            if iframe_el:
+                logger.info(f"iframe.funnel-chat-iframe found (attempt {attempt+1})")
                 break
-        except Exception:
+        except PlaywrightTimeout:
             pass
         await asyncio.sleep(1)
 
-    # Step 4: Click the pop-up greeting bubble to open full chat
-    logger.info("Clicking Funnel pop-up bubble to open chat...")
-    bubble_clicked = False
-    for selector in FUNNEL_POPUP_SELECTORS:
+    if not iframe_el:
+        logger.warning("funnel-chat-iframe never appeared in DOM")
+        return None
+
+    # Step 3: Get the frame context
+    frame = await iframe_el.content_frame()
+    if not frame:
+        logger.warning("Could not get content frame")
+        return None
+
+    logger.info(f"Frame URL: {frame.url}")
+
+    # Step 4: Wait for chat content to load inside iframe
+    logger.info("Waiting for chat content inside iframe...")
+    for attempt in range(20):
         try:
-            el = await iframe_frame.wait_for_selector(
-                selector, timeout=3000, state="visible"
+            el = await frame.wait_for_selector(
+                "[data-testid='messages'], [data-testid='chat']",
+                timeout=2000,
+                state="attached"
             )
             if el:
-                logger.info(f"Clicking pop-up: {selector}")
-                await el.click()
-                await asyncio.sleep(2)
-                bubble_clicked = True
+                logger.info(f"Chat container found (attempt {attempt+1})")
                 break
         except PlaywrightTimeout:
-            continue
-        except Exception as e:
-            logger.debug(f"Pop-up selector {selector} failed: {e}")
-            continue
+            pass
+        await asyncio.sleep(1)
 
-    if not bubble_clicked:
-        # Try JS click on anything interactive in the iframe
-        logger.info("Trying JS click on iframe interactive elements...")
-        await iframe_frame.evaluate("""
-            () => {
-                const candidates = document.querySelectorAll(
-                    '[tabindex], button, [role="button"], [onclick]'
-                );
-                for (const el of candidates) {
-                    if (el.offsetParent !== null) {
-                        el.click();
-                        return;
-                    }
-                }
-            }
-        """)
-        await asyncio.sleep(2)
+    # Step 5: Check if there's a pop-up greeting bubble to click through
+    try:
+        popup = await frame.wait_for_selector(
+            "[data-testid='pop-up-message'], [aria-label*='availability' i], [aria-label*='tour' i]",
+            timeout=3000,
+            state="visible"
+        )
+        if popup:
+            logger.info("Clicking pop-up greeting bubble...")
+            await popup.click()
+            await asyncio.sleep(2)
+    except PlaywrightTimeout:
+        logger.info("No pop-up bubble — chat already open")
 
-    # Step 5: Look for the actual chat input
-    logger.info("Looking for chat input after bubble click...")
+    # Step 6: Find the input field
     for selector in FUNNEL_INPUT_SELECTORS:
         try:
-            el = await iframe_frame.wait_for_selector(
-                selector, timeout=8000, state="visible"
+            el = await frame.wait_for_selector(
+                selector, timeout=5000, state="visible"
             )
             if el:
-                logger.success(f"Funnel chat open — input found: {selector}")
-                return iframe_frame
+                logger.success(f"Funnel chat ready — input: {selector}")
+                return frame
         except PlaywrightTimeout:
             continue
 
-    # Debug: log what's in the iframe now
+    # Log what's in the iframe for debugging
     try:
-        content = await iframe_frame.evaluate("() => document.body.innerHTML")
-        logger.info(f"Iframe after bubble click: {content[:600]}")
+        content = await frame.evaluate("() => document.body.innerHTML")
+        logger.info(f"Iframe content at failure: {content[:500]}")
     except Exception:
         pass
 
-    logger.warning("Could not open Funnel chat input after bubble click")
+    logger.warning("Could not find input field in Funnel iframe")
     return None
 
 
 async def send_funnel_message(frame, text: str) -> bool:
+    """Send a message in the Funnel chat."""
     input_el = None
     for selector in FUNNEL_INPUT_SELECTORS:
         try:
@@ -179,7 +155,7 @@ async def send_funnel_message(frame, text: str) -> bool:
             continue
 
     if not input_el:
-        logger.error("No input field in Funnel iframe")
+        logger.error("No input field found")
         return False
 
     try:
@@ -197,22 +173,93 @@ async def send_funnel_message(frame, text: str) -> bool:
         return False
 
 
+async def get_latest_bot_message(frame) -> Optional[str]:
+    """
+    Extracts the latest bot message using the exact DOM structure
+    found via live inspection: div[data-testid='message'] with aria-label.
+    """
+    try:
+        messages = await frame.evaluate("""
+            () => {
+                // Get all message elements
+                const msgs = document.querySelectorAll('[data-testid="message"]');
+                const results = [];
+                msgs.forEach(msg => {
+                    // aria-label contains the full message text
+                    const label = msg.getAttribute('aria-label') || '';
+                    // Also try the text div directly
+                    const textEl = msg.querySelector('.dPKQZ, [class*="message-text"], [class*="msg-text"]');
+                    const text = textEl ? textEl.innerText.trim() : '';
+                    results.push({
+                        label: label.replace('Chatbot says ', '').trim(),
+                        text: text,
+                    });
+                });
+                return results;
+            }
+        """)
+
+        if not messages:
+            return None
+
+        # Get the last bot message (skip persona messages)
+        for msg in reversed(messages):
+            label = msg.get('label', '')
+            text = msg.get('text', '')
+            content = label or text
+            # Filter out the generic greeting duplicates
+            if content and len(content) > 10:
+                logger.debug(f"Latest bot message: {content[:80]}")
+                return content
+
+        return None
+    except Exception as e:
+        logger.debug(f"get_latest_bot_message error: {e}")
+        return None
+
+
 async def wait_funnel_response(frame, timeout: int = 45000) -> Optional[str]:
+    """
+    Waits for a new bot message to appear using data-testid='message'.
+    Counts messages to detect when a new one arrives.
+    """
     start = time.time()
-    last_text = await frame.evaluate("() => document.body.innerText")
+
+    # Count current messages as baseline
+    try:
+        initial_count = await frame.evaluate("""
+            () => document.querySelectorAll('[data-testid="message"]').length
+        """)
+    except Exception:
+        initial_count = 0
+
+    logger.debug(f"Waiting for response (baseline: {initial_count} messages)")
 
     while (time.time() - start) * 1000 < timeout:
         try:
-            current = await frame.evaluate("() => document.body.innerText")
-            if len(current) > len(last_text) + 15:
+            current_count = await frame.evaluate("""
+                () => document.querySelectorAll('[data-testid="message"]').length
+            """)
+
+            if current_count > initial_count:
+                # New message appeared — wait for it to finish typing
                 await asyncio.sleep(2)
-                stable = await frame.evaluate("() => document.body.innerText")
-                if len(stable) >= len(current):
-                    lines = [l.strip() for l in stable.split('\n') if l.strip()]
-                    return " ".join(lines[-4:]) if lines else stable
-                last_text = current
+
+                # Verify it stabilized
+                stable_count = await frame.evaluate("""
+                    () => document.querySelectorAll('[data-testid="message"]').length
+                """)
+
+                if stable_count >= current_count:
+                    response = await get_latest_bot_message(frame)
+                    if response:
+                        logger.debug(f"Response captured: {response[:80]}")
+                        return response
+                    initial_count = current_count
+
         except Exception as e:
             logger.debug(f"Poll error: {e}")
+
         await asyncio.sleep(1)
 
     logger.warning("Timeout waiting for Funnel response")
@@ -226,10 +273,7 @@ async def run_funnel_engagement(
     orchestrator,
     db_save_fn,
 ) -> list:
-    """
-    Runs the full conversation inside the Funnel iframe.
-    Returns transcript list.
-    """
+    """Full conversation loop inside Funnel chat."""
     from database.models import (
         MessageSender, ConversationStage, ChannelType
     )
@@ -254,7 +298,7 @@ async def run_funnel_engagement(
         last_property_msg = (
             conversation_history[-1]["content"]
             if conversation_history and conversation_history[-1]["sender"] != "persona"
-            else "Hello! Welcome, how can I help you today?"
+            else "Hi, I'm Birdie, Camden's Virtual Leasing Assistant. How can I help?"
         )
 
         persona_msg = orchestrator.generate_persona_message(
@@ -278,8 +322,6 @@ async def run_funnel_engagement(
         }
         conversation_history.append(entry)
         transcript.append(entry)
-
-        # Save immediately with fresh session
         db_save_fn(
             engagement_id=engagement_id,
             sender=MessageSender.PERSONA,
@@ -299,7 +341,6 @@ async def run_funnel_engagement(
             }
             conversation_history.append(r_entry)
             transcript.append(r_entry)
-
             db_save_fn(
                 engagement_id=engagement_id,
                 sender=MessageSender.AI_BOT,
@@ -308,11 +349,11 @@ async def run_funnel_engagement(
                 content=response,
                 sent_at=received_at,
             )
-            logger.info(f"Stage {stage.value} complete — got response")
+            logger.info(f"Stage {stage.value} complete — response: {response[:80]}")
         else:
             logger.warning(f"No response at stage {stage.value}")
 
-        import asyncio, random
+        import random
         await asyncio.sleep(random.uniform(3, 6))
 
     return transcript

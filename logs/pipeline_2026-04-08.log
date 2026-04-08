@@ -1,0 +1,5 @@
+2026-04-08 13:15:39 | INFO | Orchestrator initialized with Gemini 2.5 Pro
+2026-04-08 13:15:39 | INFO | === PHASE 5: REPORT | Property 6f99938c-c3b4-4ba0-9768-a699f6eef5d6 ===
+2026-04-08 13:15:39 | INFO | ReportGenerator initialized — output: reports/output
+2026-04-08 13:15:39 | SUCCESS | Report generated: reports/output/camden_yorktown_20260408.html
+2026-04-08 13:15:39 | SUCCESS | Report written to: reports/output/camden_yorktown_20260408.html
