@@ -181,19 +181,13 @@ async def get_latest_bot_message(frame) -> Optional[str]:
     try:
         messages = await frame.evaluate("""
             () => {
-                // Get all message elements
-                const msgs = document.querySelectorAll('[data-testid="message"]');
+                // Only get bot messages using confirmed aria-label prefix
+                const msgs = document.querySelectorAll('[aria-label^="Chatbot says"]');
                 const results = [];
                 msgs.forEach(msg => {
-                    // aria-label contains the full message text
                     const label = msg.getAttribute('aria-label') || '';
-                    // Also try the text div directly
-                    const textEl = msg.querySelector('.dPKQZ, [class*="message-text"], [class*="msg-text"]');
-                    const text = textEl ? textEl.innerText.trim() : '';
-                    results.push({
-                        label: label.replace('Chatbot says ', '').trim(),
-                        text: text,
-                    });
+                    const text = label.replace(/^Chatbot says\s*/u, '').trim();
+                    if (text) results.push({label: text, text: text});
                 });
                 return results;
             }
@@ -220,38 +214,47 @@ async def get_latest_bot_message(frame) -> Optional[str]:
 
 async def wait_funnel_response(frame, timeout: int = 45000) -> Optional[str]:
     """
-    Waits for a new bot message to appear using data-testid='message'.
-    Counts messages to detect when a new one arrives.
+    Waits for a new BOT message using aria-label starting with 'Chatbot says'.
+    Counts only bot messages to avoid false positives from user messages.
     """
     start = time.time()
 
-    # Count current messages as baseline
+    # Count current BOT messages as baseline
     try:
         initial_count = await frame.evaluate("""
-            () => document.querySelectorAll('[data-testid="message"]').length
+            () => document.querySelectorAll('[aria-label^="Chatbot says"]').length
         """)
     except Exception:
         initial_count = 0
 
-    logger.debug(f"Waiting for response (baseline: {initial_count} messages)")
+    logger.debug(f"Waiting for bot response (baseline: {initial_count} bot messages)")
 
     while (time.time() - start) * 1000 < timeout:
         try:
             current_count = await frame.evaluate("""
-                () => document.querySelectorAll('[data-testid="message"]').length
+                () => document.querySelectorAll('[aria-label^="Chatbot says"]').length
             """)
 
             if current_count > initial_count:
-                # New message appeared — wait for it to finish typing
+                # New bot message appeared — wait for typing to finish
                 await asyncio.sleep(2)
 
-                # Verify it stabilized
                 stable_count = await frame.evaluate("""
-                    () => document.querySelectorAll('[data-testid="message"]').length
+                    () => document.querySelectorAll('[aria-label^="Chatbot says"]').length
                 """)
 
                 if stable_count >= current_count:
-                    response = await get_latest_bot_message(frame)
+                    # Get the latest bot message text from aria-label
+                    response = await frame.evaluate("""
+                        () => {
+                            const msgs = document.querySelectorAll('[aria-label^="Chatbot says"]');
+                            if (!msgs.length) return null;
+                            const last = msgs[msgs.length - 1];
+                            // Strip the "Chatbot says " prefix
+                            const label = last.getAttribute('aria-label') || '';
+                            return label.replace(/^Chatbot says\s*/u, '').trim();
+                        }
+                    """)
                     if response:
                         logger.debug(f"Response captured: {response[:80]}")
                         return response
