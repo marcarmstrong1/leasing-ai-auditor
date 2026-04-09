@@ -33,13 +33,7 @@ async def open_funnel_chat(page: Page) -> Optional[object]:
     iframe to be injected, then returns the frame ready for input.
     """
     logger.info("Opening Funnel chat...")
-    # Re-apply stealth to this page context just in case
-    try:
-        from playwright_stealth import stealth
-        stealth(page)
-        logger.debug("Stealth applied to page")
-    except Exception as e:
-        logger.debug(f"Stealth patch skipped: {e}")
+    logger.debug("Stealth via init scripts active")
 
     # Step 1: Click the launcher — Funnel injects the container+iframe on click
     # The container div doesn't exist yet, so we click whatever triggers it
